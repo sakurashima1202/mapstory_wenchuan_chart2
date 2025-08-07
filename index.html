@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>植被覆盖趋势图动态演示</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+      padding: 20px;
+      background: #f5f5f5;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+      font-size: 2em;
+    }
+    .chart-wrapper {
+      position: relative;
+      margin: 0 auto 30px;
+      max-width: 1000px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto !important;
+    }
+    .controls {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+    .slider-container {
+      margin: 0;
+    }
+    .slider-container label {
+      font-size: 1.1em;
+      margin-right: 10px;
+      color: #34495e;
+    }
+    #intensityRange {
+      width: 200px;
+      vertical-align: middle;
+    }
+    #intensityLabel {
+      margin-left: 10px;
+      font-weight: bold;
+      color: #e74c3c;
+    }
+    #vegetationType {
+      padding: 5px;
+      font-size: 1em;
+      vertical-align: middle;
+    }
+    #info {
+      font-size: 1em;
+      color: #7f8c8d;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.8;
+    }
+    @media (max-width: 768px) {
+      .chart-wrapper {
+        padding: 10px;
+      }
+      #intensityRange {
+        width: 150px;
+      }
+      #vegetationType {
+        width: 120px;
+      }
+      h2 {
+        font-size: 1.5em;
+      }
+      .controls {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>不同烈度下的植被覆盖趋势变化图</h2>
+    
+    <div class="chart-wrapper">
+      <canvas id="intensityChart"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="slider-container">
+        <label for="intensityRange">烈度：</label>
+        <input type="range" id="intensityRange" min="7" max="11" value="7" step="1">
+        <span id="intensityLabel">7°</span>
+      </div>
+      <div class="slider-container">
+        <label for="vegetationType">植被类型：</label>
+        <select id="vegetationType">
+          <option value="high">高、中高植被</option>
+          <option value="low">低、中低植被</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="info"></div>
+  </div>
+
+  <script>
+    const years = [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015];
+
+    const dataByIntensity = {
+      'high': {
+        '7': { data: [60.4, 26.9, 21.6, 28, 33.5, 47.2, 33.7, 49.3], equation: "y = 3.95x + 18.514", r2: 0.674, rate: 3.95 },
+        '8': { data: [57.9, 15.9, 16.6, 31.4, 53.3, 68.6, 47.2, 64.1], equation: "y = 8.6786x + 7.7286", r2: 0.7564, rate: 8.6786 },
+        '9': { data: [79.1, 11.9, 19.8, 22, 76.9, 77.9, 56.6, 77.4], equation: "y = 11.643x + 2.3571", r2: 0.6982, rate: 11.643 },
+        '10': { data: [64, 5, 19.3, 18.8, 52.9, 58.2, 31.5, 55.7], equation: "y = 7.7107x + 3.6429", r2: 0.6151, rate: 7.7107 },
+        '11': { data: [73.7, 4, 16.4, 14.5, 56.3, 44.1, 35, 53.7], equation: "y = 7.7107x + 1.1571", r2: 0.6527, rate: 7.7107 }
+      },
+      'low': {
+        '7': { data: [24.6, 57.8, 63, 51.4, 52.8, 37.1, 52.7, 23.6], equation: "y = -4.9107x + 67.986", r2: 0.6189, rate: -4.9107 },
+        '8': { data: [26.4, 70.6, 75.4, 50.6, 33.3, 19.7, 43.1, 20.4], equation: "y = -8.7893x + 79.886", r2: 0.7219, rate: -8.7893 },
+        '9': { data: [10.8, 70.2, 70.4, 58.8, 12.5, 13.7, 33.9, 14.6], equation: "y = -10.175x + 79.857", r2: 0.6718, rate: -10.175 },
+        '10': { data: [23.8, 87.9, 68.7, 68.7, 30, 30.6, 56.3, 33.3], equation: "y = -8.0964x + 86.029", r2: 0.5849, rate: -8.0964 },
+        '11': { data: [16.8, 87.8, 68.8, 74.7, 22.5, 47.1, 49.9, 36.5], equation: "y = -7.8321x + 86.657", r2: 0.5469, rate: -7.8321 }
+      }
+    };
+
+    const ctx = document.getElementById('intensityChart').getContext('2d');
+
+    let chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: years,
+        datasets: []
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '覆盖面积(%)'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: '年份'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        }
+      }
+    });
+
+    function drawDataStepByStep(vegetation, intensity) {
+      const d = dataByIntensity[vegetation][intensity];
+      const actual = d.data;
+      const rate = d.rate;
+      const intercept = Number(d.equation.split('+')[1].trim()); // 提取常数项 b
+
+      let step = 0;
+
+      const dataset1 = {
+        label: `${vegetation === 'high' ? '高、中高植被' : '低、中低植被'} 烈度 ${intensity}° 实际数据`,
+        data: [],
+        borderColor: vegetation === 'high' ? 'rgba(54, 162, 235, 1)' : 'rgba(75, 192, 192, 1)',
+        backgroundColor: vegetation === 'high' ? 'rgba(54, 162, 235, 0.2)' : 'rgba(75, 192, 192, 0.2)',
+        tension: 0.2,
+        pointRadius: 5
+      };
+
+      // 预计算整个拟合直线的所有点
+      const fitData = years.map((year, index) => {
+        const x = index; // 使用索引作为 x 偏移 (0 到 7)
+        return rate * x + intercept;
+      });
+
+      const dataset2 = {
+        label: `线性拟合`,
+        data: fitData,
+        borderDash: [5, 5],
+        borderColor: vegetation === 'high' ? 'rgba(255, 99, 132, 1)' : 'rgba(255, 159, 64, 1)',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        tension: 0
+      };
+
+      chart.data.datasets = [dataset1, dataset2];
+      chart.update();
+
+      function drawNext() {
+        if (step < years.length) {
+          chart.data.datasets[0].data.push(actual[step]);
+          chart.update();
+          step++;
+          setTimeout(drawNext, 700);
+        }
+      }
+
+      drawNext();
+
+      document.getElementById('info').innerHTML = `
+        <strong>线性拟合方程：</strong> ${d.equation} &nbsp;
+        <strong>R²：</strong> ${d.r2} &nbsp;
+        <strong>速率 K：</strong> ${d.rate}
+      `;
+    }
+
+    document.getElementById('intensityRange').addEventListener('input', updateChart);
+    document.getElementById('vegetationType').addEventListener('change', updateChart);
+
+    function updateChart() {
+      const intensity = document.getElementById('intensityRange').value;
+      const vegetation = document.getElementById('vegetationType').value;
+      document.getElementById('intensityLabel').innerText = intensity + "°";
+      drawDataStepByStep(vegetation, intensity);
+    }
+
+    // 初始化默认设置
+    updateChart();
+  </script>
+</body>
+</html>
